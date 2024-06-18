@@ -40,6 +40,7 @@ def get_h2eff_df (las, mo_coeff):
     log.debug2 ("LAS DF ERI blksize = %d, mem_av = %d MB, mem_per_aux = %d MB", blksize, mem_av, mem_per_aux)
     log.debug2 ("LAS DF ERI naux = %d, nao = %d, nmo = %d", naux, nao, nmo)
     eri = 0
+    t0 = (lib.logger.process_clock (), lib.logger.perf_counter ())
     for cderi in las.with_df.loop (blksize=blksize):
         bPmn = sparsedf_array (cderi)
         log.debug2 ("LAS DF ERI bPmn shape = %s; shares memory? %s %s; C_CONTIGUOUS? %s",
@@ -47,12 +48,14 @@ def get_h2eff_df (las, mo_coeff):
                   str (np.may_share_memory (bPmn, cderi)),
                   str (bPmn.flags['C_CONTIGUOUS']))
         bmuP1 = bPmn.contract1 (mo_cas)
+        t0 = log.timer('ERI Loop in sparsedf and contract1', *t0)
         if mem_enough_int: bmuP.append (bmuP1)
         buvP = np.tensordot (mo_cas.conjugate (), bmuP1, axes=((0),(0)))
         eri1 = np.tensordot (bmuP1, buvP, axes=((2),(2)))
         eri1 = np.tensordot (mo_coeff.conjugate (), eri1, axes=((0),(0)))
         eri += lib.pack_tril (eri1.reshape (nmo*ncas, ncas, ncas)).reshape (nmo, -1)
         cderi = bPmn = bmuP1 = buvP = eri1 = None
+        t0 = log.timer('ERI Loop in tensordots and pack_tril', *t0)
     if mem_enough_int:
         eri = lib.tag_array (eri, bmPu=np.concatenate (bmuP, axis=-1).transpose (0,2,1))
     if las.verbose > lib.logger.DEBUG:
