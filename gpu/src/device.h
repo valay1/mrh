@@ -165,6 +165,7 @@ public :
   //  };
   void init_tdm1(int);
   void init_tdm2(int);
+  void init_tdm3hab(int);
   void push_ci(py::array_t<double>,  py::array_t<double>, 
                       int , int);
   void push_link_indexa(int, int , py::array_t<int> ); //TODO: figure out the shape? or maybe move the compressed version 
@@ -177,9 +178,13 @@ public :
   void compute_tdm12kern_b(int , int , int , int , int );
   void compute_tdm12kern_ab(int , int , int , int , int );
   void compute_rdm12kern_sf(int , int , int , int , int );
+  void compute_tdm13h_spin( int , int , int , int , int , int);
+  void compute_tdm13h_spin_v2( int , int , int , int , int , int,
+                               int , int , int , int , int ,
+                               int , int , int , int , int );
   void pull_tdm1(py::array_t<double> , int );
   void pull_tdm2(py::array_t<double> , int );
-   
+  void pull_tdm3hab(py::array_t<double> ,py::array_t<double> , int );
 
   //inner functions
   void extract_mo_cas(int, int, int);//TODO: fix the difference - changed slightly
@@ -207,6 +212,10 @@ public :
   void compute_FCImake_rdm1b (double *, double *, double *, int, int, int, int, int *);
   void compute_FCIrdm2_a_t1ci (double *, double *, int, int, int, int, int*); 
   void compute_FCIrdm2_b_t1ci (double *, double *, int, int, int, int, int*); 
+  void compute_FCIrdm3h_a_t1ci (double *, double *, int, int, int, int,
+                                int, int, int, int, int*);
+  void compute_FCIrdm3h_b_t1ci (double *, double *, int, int, int, int,
+                                int, int, int, int, int*);
   // multi-gpu communication (better here or part of PM?)
 
   void mgpu_bcast(std::vector<double *>, double *, size_t);
@@ -351,8 +360,9 @@ private:
     int size_ciket;
     int size_tdm1;
     int size_tdm2;
-    int size_pdm1;
-    int size_pdm2;
+    int size_tdm2_p;
+    int size_pdm1;//do we need this anymore?
+    int size_pdm2;//do we need this anymore?
 
 
     double * d_rho;
@@ -393,9 +403,13 @@ private:
     double * d_cibra;
     double * d_ciket;
     double * d_tdm2;
+    double * d_tdm2_p;
     double * d_tdm1;
-    double * d_pdm2; 
-    double * d_pdm1;
+    double * d_tdm1h;
+    double * d_tdm3ha;
+    double * d_tdm3hb;
+    double * d_pdm2; //do we need these anymore
+    double * d_pdm1; //do we need these anymore
 
     std::vector<int> type_pumap;
     std::vector<int> size_pumap;
