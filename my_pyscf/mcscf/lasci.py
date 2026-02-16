@@ -369,8 +369,11 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
     if ci is None: ci = las.ci
 
     # In-place safety
+    log = lib.logger.new_logger (las, las.verbose)
+    t = (lib.logger.process_clock(), lib.logger.perf_counter())
     mo_coeff = mo_coeff.copy ()
     ci = copy.deepcopy (ci)
+    t = log.timer ('Canonicalize mo and ci copy', *t)
 
     # Temporary lroots safety
     # The desired behavior is that the inactive and external orbitals should
@@ -389,6 +392,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
             ci_dm.append (ci_i)
         casdm1fs = las.make_casdm1s_sub (ci=ci_dm)
 
+    t = log.timer ('Canonicalize make casdm1fs', *t)
     nao, nmo = mo_coeff.shape
     ncore = las.ncore
     nocc = ncore + las.ncas
@@ -404,6 +408,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
     if natorb_casdm1 is None: # State-average natural orbitals by default
         natorb_casdm1 = casdm1s.sum (0)
 
+    t = log.timer ('Canonicalize active orbitals', *t)
     # Inactive-inactive and virtual-virtual
     ene, umat = _eig_inactive_virtual (las, fock, orbsym=orbsym)
     idx = np.arange (nmo, dtype=int)
@@ -411,6 +416,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
     if nmo-nocc: idx[nocc:] = idx[nocc:][np.argsort (ene[nocc:])]
     umat = umat[:,idx]
     if orbsym is not None: orbsym = orbsym[idx]
+    t = log.timer ('Canonicalize inactive-inactive and virtual-virtual', *t)
     # Active-active
     check_diag = natorb_casdm1.copy ()
     for ix, ncas in enumerate (ncas_sub):
@@ -418,6 +424,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
         j = i + ncas
         check_diag[i:j,i:j] = 0.0
     is_block_diag = np.amax (np.abs (check_diag)) < 1e-8
+    t = log.timer ('Canonicalize check block diag', *t)
     if is_block_diag:
         # No off-diagonal RDM elements -> extra effort to prevent diagonalizer from breaking frags
         for isub, (ncas, nelecas) in enumerate (zip (ncas_sub, nelecas_sub)):
@@ -431,10 +438,14 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
             idx = np.argsort (occ)[::-1]
             umat[i:j,i:j] = umat[i:j,i:j][:,idx]
             if orbsym_i is not None: orbsym[i:j] = orbsym[i:j][idx]
+            t = log.timer ('Canonicalize diag setup for fci box', *t)
             if ci is not None:
+                t = log.timer ('Canonicalize ci not none?', *t)
                 fcibox = las.fciboxes[isub]
+                t = log.timer ('Canonicalize call fcibox', *t)
                 ci[isub] = fcibox.states_transform_ci_for_orbital_rotation (
                     ci[isub], ncas, nelecas, umat[i:j,i:j])
+            t = log.timer ('Canonicalize diag setup for fci', *t)
     else: # You can't get proper LAS-type CI vectors w/out active space fragmentation
         ci = None 
         orbsym_cas = None if orbsym is None else orbsym[ncore:nocc]
@@ -442,7 +453,9 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
         idx = np.argsort (occ)[::-1]
         umat[ncore:nocc,ncore:nocc] = umat[ncore:nocc,ncore:nocc][:,idx]
         if orbsym_cas is not None: orbsym[ncore:nocc] = orbsym[ncore:nocc][idx]
+        t = log.timer ('Canonicalize non diag RDM', *t)
 
+    t = log.timer ('Canonicalize active-active', *t)
     # Final
     mo_occ = np.zeros (nmo, dtype=natorb_casdm1.dtype)
     if ncore: mo_occ[:ncore] = 2
@@ -460,6 +473,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
         #mo_coeff = las.label_symmetry_(mo_coeff)
         '''
         mo_coeff = lib.tag_array (mo_coeff, orbsym=orbsym)
+    t = log.timer ('Canonicalize final mo_coeff', *t)
     if h2eff_sub is not None:
         h2eff_sub = lib.numpy_helper.unpack_tril (h2eff_sub.reshape (nmo*las.ncas, -1))
         h2eff_sub = h2eff_sub.reshape (nmo, las.ncas, las.ncas, las.ncas)
@@ -470,6 +484,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
         h2eff_sub = h2eff_sub.reshape (nmo*las.ncas, las.ncas, las.ncas)
         h2eff_sub = lib.numpy_helper.pack_tril (h2eff_sub).reshape (nmo, -1)
 
+    t = log.timer ('Canonicalize final h2eff_update', *t)
     # I/O
     log = lib.logger.new_logger (las, las.verbose)
     label = las.mol.ao_labels()
@@ -490,6 +505,7 @@ def canonicalize (las, mo_coeff=None, ci=None, casdm1fs=None, natorb_casdm1=None
             mo_las = mo_coeff[:,ncore:nocc]
             dump_mat.dump_rec(log.stdout, mo_las, label, start=1)
 
+    t = log.timer ('Canonicalize I/O', *t)
     return mo_coeff, mo_ene, mo_occ, ci, h2eff_sub
 
 def get_init_guess_ci (las, mo_coeff=None, h2eff_sub=None, ci0=None, eri_cas=None):
