@@ -4548,7 +4548,6 @@ void Device::compute_tdm13h_spin_v4(int na, int nb,
       }
 
       if ((stra_id>=ia_ket) && (stra_id<ja_ket)){
-      printf("stra_id=%d\n",stra_id); 
 
       ml->memset(dd->d_buf1, &zero, &bits_buf); // can be optimized
  
@@ -4693,7 +4692,6 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
 
   
   if (spin){
-    printf("In Spin=1 branch\n");
 
     for (int stra_id = ia_ket; stra_id<ja_ket; stra_id+=buf_batch_size){
         num_buf_batches = _MIN(final_buf_batch_size, ja_ket-stra_id);
