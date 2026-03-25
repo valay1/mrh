@@ -3771,13 +3771,10 @@ void Device::init_tdm1(int norb)
 {
   double t0 = omp_get_wtime();
   int size_tdm1 = norb*norb; 
-  //int id=0;
   for (int device_id=0; device_id<num_devices; ++device_id){
   pm->dev_set_device(device_id);
-  //pm->dev_profile_start("tdms :: init tdm1");
   my_device_data * dd = &(device_data[device_id]);
   grow_array(dd->d_tdm1, size_tdm1, dd->size_tdm1, "tdm1", FLERR);
-  //pm->dev_profile_stop();
   }
   double t1 = omp_get_wtime();
   t_array[14] += t1 - t0;
@@ -3802,9 +3799,9 @@ void Device::init_tdm3hab(int norb)
 {
   double t0 = omp_get_wtime();
   int size_tdm2 = norb*norb*norb*norb; 
+  printf("num_devices=%d\n",num_devices);
   for (int device_id=0; device_id<num_devices; ++device_id){
     pm->dev_set_device(device_id);
-    //pm->dev_profile_start("tdms :: init tdm1");
     my_device_data * dd = &(device_data[device_id]);
     grow_array(dd->d_tdm2, size_tdm2, dd->size_tdm2, "tdm2", FLERR);
     grow_array(dd->d_tdm2_p, size_tdm2, dd->size_tdm2_p, "tdm2_p", FLERR);
@@ -4598,6 +4595,20 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
   int nb_bra = jb_bra - ib_bra;
   int na_ket = ja_ket - ia_ket;
   int nb_ket = jb_ket - ib_ket;
+
+  #if 0
+  double * h_cibra = (double *)pm->dev_malloc_host(na_bra*nb_bra*sizeof(double));
+  pm->dev_pull_async(dd->d_cibra, h_cibra, na_bra*nb_bra*sizeof(double));
+  double * h_ciket = (double *)pm->dev_malloc_host(na_ket*nb_ket*sizeof(double));
+  pm->dev_pull_async(dd->d_ciket, h_ciket, na_ket*nb_ket*sizeof(double));
+  pm->dev_barrier();
+  printf("printing cibra\n");
+  for (int i=0;i<na_bra*nb_bra;++i){printf("%f\t",h_cibra[i]);}printf("\n");
+  printf("printing ciket\n");
+  for (int i=0;i<na_ket*nb_ket;++i){printf("%f\t",h_ciket[i]);}printf("\n");
+  #endif
+  printf("na=%d nb=%d nlinka=%d nlinkb=%d norb=%d spin=%d _reorder=%d ia_bra=%d ja_bra=%d ib_bra=%d jb_bra=%d sgn_bra=%d ia_ket=%d ja_ket=%d ib_ket=%d jb_ket=%d sgn_ket=%d count=%d\n", na, nb, nlinka, nlinkb, norb, spin, _reorder, ia_bra, ja_bra, ib_bra, jb_bra, sgn_bra, ia_ket, ja_ket, ib_ket, jb_ket, sgn_ket, count);
+  
   int ia_max = _MAX(ia_bra, ia_ket);
   int ja_min = _MIN(ja_bra, ja_ket);
   int ib_max = _MAX(ib_ket, ib_ket);
@@ -4634,6 +4645,7 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
 
   ml->memset(dd->d_buf1, &zero, &bits_buf); 
   ml->memset(dd->d_buf2, &zero, &bits_buf); 
+  ml->memset(dd->d_buf3, &zero, &bits_buf); 
 
   grow_array(dd->d_tdm1, size_tdm1, dd->size_tdm1, "tdm1", FLERR);
   grow_array(dd->d_tdm2, size_tdm2, dd->size_tdm2, "tdm2", FLERR); 
@@ -4642,9 +4654,14 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
   ml->memset(dd->d_tdm1, &zero, &bits_tdm1);
   ml->memset(dd->d_tdm2, &zero, &bits_tdm2);
   ml->memset(dd->d_tdm2_p, &zero, &bits_tdm2);
- 
+   
+  #if 1
 
-
+  double * h_tdm2 = (double *)pm->dev_malloc_host(norb2*norb2*sizeof(double));
+  double * h_tdm2_p = (double *)pm->dev_malloc_host(norb2*norb2*sizeof(double));
+  double * h_tdm1 = (double *)pm->dev_malloc_host(norb2*sizeof(double));
+  #endif
+  
   /*
   tdm12kern_a
     a_t1ci: cibra, clinka -> buf2
@@ -4689,6 +4706,42 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
       tdm3ha = gemm buf2, buf1
 
   */
+  #if 0
+  printf("starting\n");
+  pm->dev_pull_async(dd->d_tdm2, h_tdm2, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm2_p, h_tdm2_p, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm1, h_tdm1, norb2*sizeof(double));
+  pm->dev_barrier();
+
+  printf("printing non-zero tdm1\n");
+  for (int i=0;i<norb2;++i){
+        if (h_tdm2[i] != 0.0){
+            printf("[%d]=%f\t", i, h_tdm1[i]);
+        }
+    } printf("\n");
+
+  printf("printing non-zero tdm2\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2[idx]);
+        }
+    } printf("\n");
+  }
+
+  printf("printing non-zero tdm2_p\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2_p[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2_p[idx]);
+        }
+    } printf("\n");
+  }
+
+  #endif
+
 
   
   if (spin){
@@ -4782,12 +4835,83 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
         }
       memset_zero_batch_stride(dd->d_buf1, size_buf, zero, size_buf, num_buf_batches);
       memset_zero_batch_stride(dd->d_buf2, size_buf, zero, size_buf, num_buf_batches);
+  #if 0
+  printf("in loop\n");
+  pm->dev_pull_async(dd->d_tdm2, h_tdm2, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm2_p, h_tdm2_p, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm1, h_tdm1, norb2*sizeof(double));
+  pm->dev_barrier();
+
+  printf("printing non-zero tdm1\n");
+  for (int i=0;i<norb2;++i){
+        if (h_tdm2[i] != 0.0){
+            printf("[%d]=%f\t", i, h_tdm1[i]);
+        }
+    } printf("\n");
+
+  printf("printing non-zero tdm2\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2[idx]);
+        }
+    } printf("\n");
+  }
+
+  printf("printing non-zero tdm2_p\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2_p[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2_p[idx]);
+        }
+    } printf("\n");
+  }
+
+  #endif
+
       }
 
     }
   transpose_jikl(dd->d_tdm2, dd->d_buf1, norb);
   transpose_jikl(dd->d_tdm2_p, dd->d_buf2, norb);
+  #if 0
 
+  printf("after all loops\n");
+  pm->dev_pull_async(dd->d_tdm2, h_tdm2, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm2_p, h_tdm2_p, norb2*norb2*sizeof(double));
+  pm->dev_pull_async(dd->d_tdm1, h_tdm1, norb2*sizeof(double));
+  pm->dev_barrier();
+
+  printf("printing non-zero tdm1\n");
+  for (int i=0;i<norb2;++i){
+        if (h_tdm2[i] != 0.0){
+            printf("[%d]=%f\t", i, h_tdm1[i]);
+        }
+    } printf("\n");
+
+  printf("printing non-zero tdm2\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2[idx]);
+        }
+    } printf("\n");
+  }
+
+  printf("printing non-zero tdm2_p\n");
+  for (int i=0;i<norb2;++i){
+    for (int j=0;j<norb2;++j){
+        int idx = i*norb2 + j;
+        if (h_tdm2_p[idx] != 0.0){
+            printf("[%d][%d]=%f\t", i, j, h_tdm2_p[idx]);
+        }
+    } printf("\n");
+  }
+
+  #endif
   pm->dev_profile_stop();
   double t1 = omp_get_wtime();
   t_array[26] += t1-t0;//TODO: fix this
@@ -4853,7 +4977,10 @@ void Device::compute_tdmpp_spin_v4(int na, int nb, int nlinka, int nlinkb, int n
   ml->memset(dd->d_buf2, &zero, &bits_buf); 
   grow_array(dd->d_tdm1, size_tdm1, dd->size_tdm1, "tdm1", FLERR);
   grow_array(dd->d_tdm2, size_tdm2, dd->size_tdm2, "tdm2", FLERR); 
+  grow_array(dd->d_tdm2_p, size_tdm2, dd->size_tdm2_p, "tdm2_p", FLERR); 
   ml->memset(dd->d_tdm2, &zero, &bits_tdm2);
+  ml->memset(dd->d_tdm1, &zero, &bits_tdm1);
+  ml->memset(dd->d_tdm2_p, &zero, &bits_tdm2);
   
  /*
  tdm12kern_a
