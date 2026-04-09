@@ -1,0 +1,140 @@
+<module 'pyscf.df.df_jk' from '/grand/LASSCF_gpudev/soft/pyscf/pyscf/df/df_jk.py'> monkey-patched to GPU accelerated version
+<function M at 0x1509e11af600> monkey-patched to include use_gpu flag
+<function _ERIS.__init__ at 0x1509de4ca160> inside CASSCF DF ERIS monkey-patched to GPU accelerated version
+<function make_rdm1_spin1 at 0x1509de293560> inside FCI rdm monkey-patched to GPU accelerated version
+<function make_rdm12_spin1 at 0x1509de486a20> inside FCI rdm monkey-patched to GPU accelerated version
+<function reorder_rdm at 0x1509de2937e0> inside FCI rdm monkey-patched to GPU accelerated version
+<function trans_rdm12s at 0x1509de293880> inside FCI direct_spin1 monkey-patched to GPU accelerated version
+<function trans_rdm1s at 0x1509de293ce0> inside FCI direct_spin1 monkey-patched to GPU accelerated version
+Inside mrh::mole.py adding use_gpu flag
+overwrite output file: test.log
+0 (6, 3) 0 0 (126, 84) (84, 84)
+Trans RDM13hs calculated correctly
+0 (6, 3) 1 0 (84, 36) (84, 84)
+Trans RDM13hs calculated correctly
+stra_id=84
+stra_id=85
+stra_id=86
+stra_id=87
+stra_id=88
+stra_id=89
+stra_id=90
+stra_id=91
+stra_id=92
+stra_id=93
+stra_id=94
+stra_id=95
+stra_id=96
+stra_id=97
+stra_id=98
+stra_id=99
+stra_id=100
+stra_id=101
+stra_id=102
+stra_id=103
+stra_id=104
+stra_id=105
+stra_id=106
+stra_id=107
+stra_id=108
+stra_id=109
+stra_id=110
+stra_id=111
+stra_id=112
+stra_id=113
+stra_id=114
+stra_id=115
+stra_id=116
+stra_id=117
+stra_id=118
+stra_id=119
+stra_id=120
+stra_id=121
+stra_id=122
+stra_id=123
+stra_id=124
+stra_id=125
+stra_id=126
+stra_id=127
+stra_id=128
+stra_id=129
+stra_id=130
+stra_id=131
+stra_id=132
+stra_id=133
+stra_id=134
+stra_id=135
+stra_id=136
+stra_id=137
+stra_id=138
+stra_id=139
+stra_id=140
+stra_id=141
+stra_id=142
+stra_id=143
+stra_id=144
+stra_id=145
+stra_id=146
+stra_id=147
+stra_id=148
+stra_id=149
+stra_id=150
+stra_id=151
+stra_id=152
+stra_id=153
+stra_id=154
+stra_id=155
+stra_id=156
+stra_id=157
+stra_id=158
+stra_id=159
+stra_id=160
+stra_id=161
+stra_id=162
+stra_id=163
+stra_id=164
+stra_id=165
+stra_id=166
+stra_id=167
+stra_id=168
+stra_id=169
+stra_id=170
+stra_id=171
+stra_id=172
+stra_id=173
+stra_id=174
+stra_id=175
+stra_id=176
+stra_id=177
+stra_id=178
+stra_id=179
+stra_id=180
+stra_id=181
+stra_id=182
+stra_id=183
+stra_id=184
+stra_id=185
+stra_id=186
+stra_id=187
+stra_id=188
+stra_id=189
+stra_id=190
+stra_id=191
+stra_id=192
+stra_id=193
+stra_id=194
+stra_id=195
+stra_id=196
+stra_id=197
+stra_id=198
+stra_id=199
+stra_id=200
+stra_id=201
+stra_id=202
+stra_id=203
+stra_id=204
+stra_id=205
+stra_id=206
+stra_id=207
+stra_id=208
+stra_id=209

@@ -3799,7 +3799,6 @@ void Device::init_tdm3hab(int norb)
 {
   double t0 = omp_get_wtime();
   int size_tdm2 = norb*norb*norb*norb; 
-  printf("num_devices=%d\n",num_devices);
   for (int device_id=0; device_id<num_devices; ++device_id){
     pm->dev_set_device(device_id);
     my_device_data * dd = &(device_data[device_id]);
@@ -4607,7 +4606,7 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
   printf("printing ciket\n");
   for (int i=0;i<na_ket*nb_ket;++i){printf("%f\t",h_ciket[i]);}printf("\n");
   #endif
-  printf("na=%d nb=%d nlinka=%d nlinkb=%d norb=%d spin=%d _reorder=%d ia_bra=%d ja_bra=%d ib_bra=%d jb_bra=%d sgn_bra=%d ia_ket=%d ja_ket=%d ib_ket=%d jb_ket=%d sgn_ket=%d count=%d\n", na, nb, nlinka, nlinkb, norb, spin, _reorder, ia_bra, ja_bra, ib_bra, jb_bra, sgn_bra, ia_ket, ja_ket, ib_ket, jb_ket, sgn_ket, count);
+  //printf("na=%d nb=%d nlinka=%d nlinkb=%d norb=%d spin=%d _reorder=%d ia_bra=%d ja_bra=%d ib_bra=%d jb_bra=%d sgn_bra=%d ia_ket=%d ja_ket=%d ib_ket=%d jb_ket=%d sgn_ket=%d count=%d\n", na, nb, nlinka, nlinkb, norb, spin, _reorder, ia_bra, ja_bra, ib_bra, jb_bra, sgn_bra, ia_ket, ja_ket, ib_ket, jb_ket, sgn_ket, count);
   
   int ia_max = _MAX(ia_bra, ia_ket);
   int ja_min = _MIN(ja_bra, ja_ket);
@@ -4655,7 +4654,7 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
   ml->memset(dd->d_tdm2, &zero, &bits_tdm2);
   ml->memset(dd->d_tdm2_p, &zero, &bits_tdm2);
    
-  #if 1
+  #if 0
 
   double * h_tdm2 = (double *)pm->dev_malloc_host(norb2*norb2*sizeof(double));
   double * h_tdm2_p = (double *)pm->dev_malloc_host(norb2*norb2*sizeof(double));
@@ -4758,6 +4757,7 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
             dd->d_buf2, &norb2, &size_buf, 
             &beta, dd->d_buf3, &norb2, &size_tdm2, &num_buf_batches); 
         reduce_buf3_to_rdm(dd->d_buf3, dd->d_tdm2, size_tdm2, num_buf_batches);
+        #if  0
         ml->gemv_batch((char *) "N", &norb2, &nb_bra,
           &alpha,
           &(dd->d_buf1[ib_bra * norb2]), &norb2, &size_buf,
@@ -4765,7 +4765,21 @@ void Device::compute_tdm13h_spin_v5(int na, int nb,
           &beta,
           dd->d_buf3, &one, &size_tdm1,
           &num_buf_batches);
-          reduce_buf3_to_rdm(dd->d_buf3, dd->d_tdm1, size_tdm1, num_buf_batches);
+        reduce_buf3_to_rdm(dd->d_buf3, dd->d_tdm1, size_tdm1, num_buf_batches);
+        #else
+        int gemv_start_id = _MAX(stra_id, ia_bra);
+        int gemv_end_id = _MIN(stra_id + num_buf_batches, ja_bra);
+        int gemv_batches = _MAX(0, gemv_end_id - gemv_start_id);
+        ml->gemv_batch((char *) "N", &norb2, &nb_bra,
+          &alpha,
+          &(dd->d_buf1[(gemv_start_id - stra_id)*size_buf + ib_bra * norb2]), &norb2, &size_buf,
+          &(dd->d_cibra[(gemv_start_id - ia_bra) * nb_bra]), &one, &nb_bra,
+          &beta,
+          dd->d_buf3, &one, &size_tdm1,
+          &gemv_batches);
+        reduce_buf3_to_rdm(dd->d_buf3, dd->d_tdm1, size_tdm1, gemv_batches);
+         
+        #endif
 
 	memset_zero_batch_stride(dd->d_buf1, size_buf, zero, size_buf, num_buf_batches);
 

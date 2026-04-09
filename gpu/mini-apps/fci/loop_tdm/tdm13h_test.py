@@ -10,6 +10,7 @@ from mrh.my_pyscf.fci.rdm import _unpack
 from mrh.my_pyscf.fci import dummy
 import math
 from mrh.my_pyscf.fci.rdm import trans_sfudm1 
+from gpu4mrh.fci.rdm_loops import trans_rdm13h as trans_rdm13h_loop
 from itertools import product
 
 def multi_gpu_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder):
@@ -20,7 +21,6 @@ def multi_gpu_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder):
   nelec = list (_unpack_nelec (nelec))
   tdm1h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],norb), dtype=bravecs.dtype)
   tdm3h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],2,norb,norb,norb), dtype=bravecs.dtype)
-  cre = False #doing this because that's what the main function is
   if not cre:
       bravecs, ketvecs = ketvecs, bravecs
       nelec[spin] -= 1
@@ -53,7 +53,7 @@ def multi_gpu_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder):
   for count, (j, i) in enumerate(product (range(n_ket), range(n_bra))):
     libgpu.push_cibra_from_host(gpu, i, na_bra, nb_bra, count)
     libgpu.push_ciket_from_host(gpu, j, na_ket, nb_ket, count)
-    libgpu.compute_tdm13h_spin_v4(gpu, na, nb, nlinka, nlinkb, norb+1, spin, reorder,
+    libgpu.compute_tdm13h_spin_v5(gpu, na, nb, nlinka, nlinkb, norb+1, spin, reorder,
                                  ia_bra, ja_bra, ib_bra, jb_bra, sgn_bra,
                                  ia_ket, ja_ket, ib_ket, jb_ket, sgn_ket, count) #TODO: write a better name
     if reorder: libgpu.reorder_rdm(gpu, norb+1, count)
@@ -62,12 +62,13 @@ def multi_gpu_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder):
   libgpu.copy_tdm1_host_to_page(gpu, tdm1h, size_tdm1h_full) 
   libgpu.copy_tdm2_host_to_page(gpu, tdm3h, size_tdm3h_full) 
   return tdm1h, tdm3h
+
+
+
   
-def o0_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder):
+def o0_loop(tdm1h, tdm3h, cre, bravecs, ketvecs,norb,nelec, spin, reorder):
   from mrh.my_pyscf.fci.rdm import trans_rdm13ha_des, trans_rdm13hb_des #is make_rdm12_spin1
   trans_rdm13h = (trans_rdm13ha_des, trans_rdm13hb_des)[spin]
-  tdm1h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],norb), dtype=bravecs.dtype)
-  tdm3h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],2,norb,norb,norb), dtype=bravecs.dtype)
   for i, j in product (range (bravecs.shape[0]), range (ketvecs.shape[0])):
     d1s, d2s = trans_rdm13h (bravecs[i], ketvecs[j], norb, nelec, link_index=None)
     tdm1h[i,j] = d1s
@@ -85,6 +86,7 @@ def test_tdm13h_loop(cre, n_bra, n_ket, norb, nelec, spin, reorder):
     nelec_ket = _unpack_nelec(nelec_copy)
     nelec_bra = [x for x in nelec_copy]
     nelec_bra[spin] += 1
+    linkstr = _unpack (norb+1, nelec_bra, None)
     
     na_bra = math.comb(norb, nelec_bra[0])
     nb_bra = math.comb(norb, nelec_bra[1])
@@ -95,9 +97,15 @@ def test_tdm13h_loop(cre, n_bra, n_ket, norb, nelec, spin, reorder):
     ketvecs = np.empty((n_ket, na_ket, nb_ket))
     for _nbra in range(n_bra): bravecs[_nbra] = np.random.random((na_bra, nb_bra))
     for _nket in range(n_ket): ketvecs[_nket] = np.random.random((na_ket, nb_ket))
+    #for _nbra in range(n_bra): bravecs[_nbra] = np.arange(na_bra*nb_bra).reshape(na_bra,nb_bra)+0.5 #random.random((na_bra, nb_bra))
+    #for _nket in range(n_ket): ketvecs[_nket] = np.arange(na_ket*nb_ket).reshape(na_ket,nb_ket)+0.5 #random.random((na_ket, nb_ket))
     if not cre:
       bravecs, ketvecs = ketvecs, bravecs
     
+    tdm1h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],norb), dtype=bravecs.dtype)
+    tdm3h = np.zeros ((bravecs.shape[0],ketvecs.shape[0],2,norb,norb,norb), dtype=bravecs.dtype)
+    tdm1h_c = np.zeros ((bravecs.shape[0],ketvecs.shape[0],norb), dtype=bravecs.dtype)
+    tdm3h_c = np.zeros ((bravecs.shape[0],ketvecs.shape[0],2,norb,norb,norb), dtype=bravecs.dtype)
     from pyscf.lib import param
     try: 
       use_gpu = param.use_gpu
@@ -116,10 +124,14 @@ def test_tdm13h_loop(cre, n_bra, n_ket, norb, nelec, spin, reorder):
     except: mgpu_fci_debug = False
 
     if mgpu_fci and mgpu_fci_debug and use_gpu:
-      tdm1h, tdm3h = o0_loop(cre, bravecs, ketvecs,norb,nelec, spin, reorder)
-      tdm1h_c, tdm3h_c = multi_gpu_loop(cre, bravecs, ketvecs,norb, nelec, spin, reorder)
+      #gpu = param.use_gpu
+      #param.use_gpu = None
+      tdm1h, tdm3h = o0_loop(tdm1h, tdm3h, cre, bravecs, ketvecs,norb,nelec, spin, reorder)
+      #param.use_gpu = gpu
+      tdm1h_c, tdm3h_c = trans_rdm13h_loop(tdm1h_c, tdm3h_c, bravecs, ketvecs,norb, nelec, spin, linkstr, reorder, cre)
       tdm1h_correct = np.allclose(tdm1h, tdm1h_c)
       tdm3h_correct = np.allclose(tdm3h, tdm3h_c)
+      print(tdm3h.shape, tdm3h_c.shape)
       if tdm1h_correct and tdm3h_correct: 
         print('TDM13h loop calculated correctly')
       else:
@@ -127,10 +139,19 @@ def test_tdm13h_loop(cre, n_bra, n_ket, norb, nelec, spin, reorder):
         print('TDM1h correct?', tdm1h_correct)
         print('TDM3h correct?', tdm3h_correct)
         diff = tdm3h-tdm3h_c
+        print("checking 3h tdm")
         for i, j in product (range (bravecs.shape[0]), range (ketvecs.shape[0])):
-          if np.sum([diff[i,j]!=0]): 
+          if not np.allclose(tdm3h[i,j],tdm3h_c[i,j]):
             print('bra:',i, 'ket',j, False)
-          else: print('bra:',i, 'ket',j, True)
+          else: pass #
+        print("checking 1h tdm")
+        for i, j in product (range (bravecs.shape[0]), range (ketvecs.shape[0])):
+          if not np.allclose(tdm1h[i,j],tdm1h_c[i,j]):
+            print('bra:',i, 'ket',j, False)
+            #print(tdm1h[i,j])
+            #print(tdm1h_c[i,j])
+          else: pass #
+ 
         exit()
     elif custom_fci and use_gpu and mgpu_fci: 
       print("in gpu channel")
@@ -169,12 +190,13 @@ if __name__=="__main__":
   mf.with_df.auxbasis = pyscf.df.make_auxbasis(mol)
   mf.max_cycle=1
   mf.kernel()
+  print(mf.with_df.get_naoaux())
 
   #norb, nelec,  n_bra, n_ket = 4,4, 9,7
   #norb, nelec,  n_bra, n_ket = 8,14, 4,5
   #norb, nelec,  n_bra, n_ket = 8,6, 4,5
-  #norb, nelec,  n_bra, n_ket = 4,3, 2,3
-  norb, nelec,  n_bra, n_ket = 11,15, 5,4
-  [test_tdm13h_loop(cre, n_bra, n_ket,norb, nelec, spin, reorder) for cre in range(2) for spin in range(2) for reorder in range(2)]
+  norb, nelec,  n_bra, n_ket = 10,(7,3), 5,7
+  #norb, nelec,  n_bra, n_ket = 11,15, 5,4
+  [test_tdm13h_loop(cre, n_bra, n_ket,norb, nelec, spin, reorder) for cre in range(2) for spin in range(2) for reorder in range(1,2)]
   if gpu_run: libgpu.destroy_device(gpu)
 

@@ -36,8 +36,6 @@ mf.with_df.auxbasis = pyscf.df.make_auxbasis(mol)
 mf.max_cycle=1
 mf.kernel()
 
-norb = 4
-nelec = 3
 
 def run_test(cre, norb, nelec, spin, reorder):
     nelec_copy = list(_unpack_nelec(nelec))
@@ -60,5 +58,13 @@ def run_test(cre, norb, nelec, spin, reorder):
     print(cre, nelec, spin, reorder, cibra.shape, ciket.shape)
     _trans_rdm13hs(cre, cibra , ciket, norb, nelec, spin, None, reorder)
 
+norb = 9
+nelec = (6,3)
+
+[run_test(cre, norb, nelec, spin, reorder) for cre in range(1) for spin in range(2) for reorder in range(1)]
+
+
+norb = 12
+nelec = (7,5)
 
 [run_test(cre, norb, nelec, spin, reorder) for cre in range(1) for spin in range(2) for reorder in range(1)]

@@ -195,7 +195,7 @@ def _trans_rdm13hs (cre, cibra, ciket, norb, nelec, spin=0, link_index=None, reo
       ### Old kernel
       tdm1h, tdm3ha, tdm3hb = _trans_rdm13hs_o0(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
       ### New kernel
-      tdm1h_c, tdm3ha_c, tdm3hb_c = _trans_rdm13hs_o6(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
+      tdm1h_c, tdm3ha_c, tdm3hb_c = _trans_rdm13hs_o5(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
       tdm1_correct = np.allclose(tdm1h, tdm1h_c)
       tdm3ha_correct = np.allclose(tdm3ha, tdm3ha_c)
       tdm3hb_correct = np.allclose(tdm3hb, tdm3hb_c)
@@ -208,7 +208,7 @@ def _trans_rdm13hs (cre, cibra, ciket, norb, nelec, spin=0, link_index=None, reo
         print('TDM3hb correct?', tdm3hb_correct)
         exit()
     elif custom_fci and use_gpu: 
-      tdm1h, tdm3ha, tdm3hb = _trans_rdm13hs_o6(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
+      tdm1h, tdm3ha, tdm3hb = _trans_rdm13hs_o5(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
     else:
       tdm1h, tdm3ha, tdm3hb = _trans_rdm13hs_o0(cre, cibra, ciket, norb, nelec, spin=spin, link_index=link_index, reorder = reorder)
     return tdm1h, (tdm3ha, tdm3hb)
@@ -272,9 +272,6 @@ def _trans_rdm13hs_o5(cre, cibra, ciket, norb, nelec, spin=0, link_index=None, r
     na_ket, nb_ket = ciket.shape
     libgpu.push_cibra(gpu, cibra, na_bra, nb_bra, 0)
     libgpu.push_ciket(gpu, ciket, na_ket, nb_ket, 0)
-    #print("cibra: size", na_bra, "x",nb_bra, "=", na_bra*nb_bra)
-    #print("ciket: size", na_ket, "x",nb_ket, "=", na_ket*nb_ket)
-    
 
     tdm1h = np.empty((norb))
     tdm3ha = np.empty((norb, norb, norb))
@@ -291,6 +288,7 @@ def _trans_rdm13hs_o5(cre, cibra, ciket, norb, nelec, spin=0, link_index=None, r
     return tdm1h, tdm3ha, tdm3hb 
 
 def _trans_rdm13hs_o6(cre, cibra, ciket, norb, nelec, spin=0, link_index=None, reorder=True):
+    print('reorder=',reorder)
     '''GPU accelerated _trand_rdm13hs with custom FCI kernel'''
     from mrh.my_pyscf.gpu import libgpu
     gpu=param.use_gpu

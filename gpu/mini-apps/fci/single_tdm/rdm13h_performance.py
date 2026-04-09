@@ -16,6 +16,7 @@ import itertools
 
 def performance_checker(cre, norb, nelec, spin=0, link_index = None, reorder=False, nruns = 10):
   nelec_copy = list(_unpack_nelec(nelec))
+  gpu = param.use_gpu
   if not cre:
       nelec_copy[spin] -=1
   nelec_ket = _unpack_nelec(nelec_copy)
@@ -39,6 +40,7 @@ def performance_checker(cre, norb, nelec, spin=0, link_index = None, reorder=Fal
   for _ in range(nruns): 
     _trans_rdm13hs(cre, cibra, ciket, norb, nelec, spin=spin, link_index = link_index, reorder=reorder)
   t2 = time.time()
+  param.use_gpu = gpu
   return t1-t0, t2-t1
 
 if __name__ == "__main__": 
@@ -46,15 +48,23 @@ if __name__ == "__main__":
     gpu = libgpu.init()
     from pyscf.lib import param
     param.use_gpu = gpu
-    libgpu.set_verbose_(gpu, 1)
+    #libgpu.set_verbose_(gpu, 1)
     #param.gpu_debug=True
     param.custom_fci=True
   lib.logger.TIMER_LEVEL=lib.logger.INFO
   
   geom = ''' K 0 0 0;
-             K 0 0 2;'''
+             K 0 0 2;
+             K 0 0 4;
+             K 0 0 6;
+             K 0 0 8;
+             K 0 0 10;
+             K 0 0 12;
+             K 0 0 14;
+             K 0 0 16;
+             K 0 0 18;'''
   
-  if gpu_run: mol = gto.M(use_gpu = gpu, atom=geom, basis='631g', verbose=1)
+  if gpu_run: mol = gto.M(use_gpu = gpu, atom=geom, basis='def2-TZVP', verbose=1)
   else: mol = gto.M(atom=geom, basis='631g', verbose=1)
   
   mol.output='test.log'
@@ -67,7 +77,7 @@ if __name__ == "__main__":
   mf.kernel()
   
   norb = 11
-  nelec = 15
+  nelec = (6,6)
   
   for cre, spin, reorder in itertools.product(range(2), range(2), range(2)): 
       print(cre, spin, reorder)
