@@ -593,6 +593,7 @@ class LASSIS_Scanner(lib.SinglePointScanner):
         return e_tot
 
 class LASSIS (LASSI):
+    _method_key = 'lsis'
     def __init__(self, las, ncharge='s', nspin='s', sa_heff=True, deactivate_vrv=False,
                  crash_locmin=False, opt=1, **kwargs):
         '''
@@ -616,6 +617,7 @@ class LASSIS (LASSI):
         self.deactivate_vrv = deactivate_vrv
         self.crash_locmin = crash_locmin
         self.e_states_meaningless = True # a tag to silence an invalid warning
+        self.mask_charge_hops = None
         LASSI.__init__(self, las, opt=opt, **kwargs)
         self._max_cycle_macro = None
         self._conv_tol_self = None
@@ -626,11 +628,18 @@ class LASSIS (LASSI):
                                for i in range (self.nfrags)]
         self.cisolver_attr_charge_hops = {}
         self._cached_ham_2q = None
-        self.mask_charge_hops = None
         self.ci = None
         if las.nroots>1:
             logger.warn (self, ("Only the first LASSCF state is used by LASSIS! "
                                 "Other states are discarded!"))
+
+    def get_o1_chk_hash (self):
+        m = LASSI.get_o1_chk_hash (self)
+        m.update (bytes (str (self.ncharge), encoding='utf8'))
+        m.update (bytes (str (self.nspin), encoding='utf8'))
+        if self.mask_charge_hops is not None:
+            m.update (self.mask_charge_hops.tobytes ())
+        return m
 
     @property
     def conv_tol_self (self):
@@ -768,6 +777,7 @@ class LASSIS (LASSI):
         self.weights = las.weights
         self.e_lexc = las.e_lexc
         self.e_states = las.e_states
+        self._reset_o1_chk ()
         return
 
     def energy_tot (self, mo_coeff=None, ci_ref=None, ci_sf=None, ci_ch=None, si=None, soc=None):
@@ -789,7 +799,7 @@ class LASSIS (LASSI):
             sfattr = {k: v for k, v in self.cisolver_attr_spin_flips.items ()}
             sfattr['max_cycle'] = 0
             with lib.temporary_env (self, cisolver_attr_charge_hops=chattr,
-                                    cisolver_attr_spin_flips=sfatter):
+                                    cisolver_attr_spin_flips=sfattr):
                 self.prepare_states_()
             ci = self.ci
         assert (ci is not None)

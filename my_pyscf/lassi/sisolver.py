@@ -151,10 +151,12 @@ class SISolver (lib.StreamObject):
     '''
 
     def __init__(self, las, soc=0, opt=1, davidson_only=False, nroots=NROOTS,
-                 max_memory=param.MAX_MEMORY):
+                 chkfile=None, max_memory=param.MAX_MEMORY):
+        if chkfile is None: chkfile = getattr (las, 'chkfile', None)
         self.las = las # I need this because op_o? fns need this
         self.verbose = las.verbose
         self.stdout = las.stdout
+        self.chkfile = chkfile
         self.max_memory = max_memory
         self.davidson_only = davidson_only
         self.max_cycle = MAX_CYCLE
@@ -167,6 +169,10 @@ class SISolver (lib.StreamObject):
         self.nroots = nroots
         self.smult = None
         self.converged = False
+        if callable (getattr (las, 'get_o1_chk_key', None)):
+            self.get_method_key = las.get_o1_chk_key
+        else:
+            self.get_method_key = lambda *args: None
         self._keys = set((self.__dict__.keys()))
 
     kernel = kernel
@@ -209,9 +215,10 @@ def kernel_Davidson (sisolver, e0, h1, h2, norb_f, ci_fr, nelec_frs, smult_fr, d
     screen_thresh = getattr (sisolver, 'davidson_screen_thresh', DAVIDSON_SCREEN_THRESH)
     pspace_size = getattr (sisolver, 'pspace_size', PSPACE_SIZE)
     smult = getattr (sisolver, 'smult', None)
+    chkfile = getattr (sisolver, 'chkfile', None)
     h_op_raw, s2_op, ovlp_op, hdiag_raw, _get_ovlp = op[opt].gen_contract_op_si_hdiag (
         sisolver.las, h1, h2, ci_fr, nelec_frs, smult_fr=smult_fr, soc=soc, disc_fr=disc_fr,
-        screen_thresh=screen_thresh
+        screen_thresh=screen_thresh, chkfile=chkfile, chkkey=sisolver.get_method_key ()
     )
     if verbose >= logger.DEBUG:
         # The sort is slow
@@ -333,8 +340,10 @@ def kernel_incore (sisolver, e0, h1, h2, norb_f, ci_fr, nelec_frs, smult_fr, soc
     # TODO: simplify
     t0 = (logger.process_clock (), logger.perf_counter ())
      
+    chkfile = getattr (sisolver, 'chkfile', None)
     ham_blk, s2_blk, ovlp_blk, _get_ovlp = op[opt].ham (
-        sisolver.las, h1, h2, ci_fr, nelec_frs, smult_fr=smult_fr, soc=soc)
+        sisolver.las, h1, h2, ci_fr, nelec_frs, smult_fr=smult_fr, soc=soc,
+        chkfile=chkfile, chkkey=sisolver.get_method_key ())
     t0 = logger.timer (sisolver, 'LASSI H build', *t0)
 
     # Error catch: linear dependencies in basis
