@@ -162,6 +162,7 @@ public :
   void init_tdm3hab(int);
   void init_tdm1_host(int);
   void init_tdm2_host(int);
+  void init_tdm3_host(int);
   void init_tdm3h_host(int);
   void copy_bravecs_host(py::array_t<double>, int , int, int);
   void copy_ketvecs_host(py::array_t<double>, int , int, int);
@@ -195,11 +196,13 @@ public :
   void compute_tdm1h_spin( int , int , int , int , int , int,
                            int , int , int , int , int ,
                            int , int , int , int , int , int);
+  void compute_3pdm_kern_sf(int , int , int , int , int, int );
 
   void reorder_rdm(int, int);
   void transpose_tdm2(int, int);
   void pull_tdm1(py::array_t<double> , int, int );
   void pull_tdm2(py::array_t<double> , int, int );
+  void pull_tdm3(py::array_t<double> , int, int );
 
   void pull_tdm1_host(int, int, int, int, int, int, int);
   void pull_tdm2_host(int, int, int, int, int, int, int);
@@ -465,6 +468,7 @@ private:
     int size_tdm1;
     int size_tdm2;
     int size_tdm2_p;
+    int size_tdm3;
     int size_pdm1;//do we need this anymore?
     int size_pdm2;//do we need this anymore?
 
@@ -514,6 +518,7 @@ private:
     double * d_tdm3hb;
     double * d_pdm2; //do we need these anymore
     double * d_pdm1; //do we need these anymore
+    double * d_tdm3;
     
     std::vector<int> type_pumap;
     std::vector<int> size_pumap;

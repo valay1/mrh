@@ -28,7 +28,6 @@ void * libgpu_init()
   
   return (void *) ptr;
 }
-
 /* ---------------------------------------------------------------------- */
 
 void * libgpu_create_device()
@@ -375,6 +374,14 @@ void libgpu_init_tdm2(void * ptr,
   dev->init_tdm2(norb);
 }
 /* ---------------------------------------------------------------------- */
+void libgpu_init_tdm3(void * ptr, 
+                      int norb)
+{
+  Device * dev = (Device *) ptr;
+  dev->init_tdm3(norb);
+}
+
+/* ---------------------------------------------------------------------- */
 void libgpu_init_tdm1_host(void * ptr, int size_dm)
 { 
   Device * dev = (Device *) ptr;
@@ -593,6 +600,13 @@ void libgpu_compute_tdm1h_spin( void *ptr,
                      ia_ket, ja_ket, ib_ket, jb_ket, sgn_ket, count );
 }
 /* ---------------------------------------------------------------------- */
+void libgpu_compute_3pdm_kern_sf( void *ptr, 
+                            int na, int nb, int nlinka, int nlinkb, int norb, int count)   
+{
+  Device * dev = (Device *) ptr;
+  dev->compute_3pdm_kern_sf(na, nb, nlinka, nlinkb, norb, count); 
+}
+/* ---------------------------------------------------------------------- */
 void libgpu_pull_tdm1(void * ptr, 
                       py::array_t<double> tdm1, int norb, int count)
 {
@@ -605,6 +619,13 @@ void libgpu_pull_tdm2(void * ptr,
 {
   Device * dev = (Device *) ptr;
   dev->pull_tdm2(tdm2, norb, count);
+}
+/* ---------------------------------------------------------------------- */
+void libgpu_pull_tdm3(void * ptr, 
+                      py::array_t<double> tdm3, int norb, int count)
+{
+  Device * dev = (Device *) ptr;
+  dev->pull_tdm3(tdm3, norb, count);
 }
 /* ---------------------------------------------------------------------- */
 void libgpu_pull_tdm1_host(void * ptr, 
