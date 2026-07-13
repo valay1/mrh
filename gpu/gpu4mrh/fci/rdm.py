@@ -245,3 +245,105 @@ def _make_rdm12_spin1(fname, cibra, ciket, norb, nelec, link_index=None, symm=0)
                         link_indexb.ctypes.data_as(ctypes.c_void_p),
                         ctypes.c_int(symm))
       return rdm1.T, rdm2
+
+
+def _make_dm123(fname, cibra, ciket, norb, nelec):
+    assert (cibra is not None and ciket is not None)
+    from pyscf.lib import param
+    try:
+      use_gpu = param.use_gpu
+      gpu = param.use_gpu
+    except: 
+      use_gpu = None
+    try: gpu_debug = param.gpu_debug
+    except: gpu_debug = False
+
+    if link_index is None:
+        neleca, nelecb = _unpack_nelec(nelec)
+        link_indexa = link_indexb = cistring.gen_linkstr_index(range(norb), neleca)
+        if neleca != nelecb:
+            link_indexb = cistring.gen_linkstr_index(range(norb), nelecb)
+    else:
+        link_indexa, link_indexb = link_index
+    na,nlinka = link_indexa.shape[:2]
+    nb,nlinkb = link_indexb.shape[:2]
+    if use_gpu and gpu_debug: 
+      rdm1_cpu, rdm2_cpu, rdm3_cpu = _make_dm123_o0(fname, cibra, ciket, norb, nelec)
+      rdm1_gpu, rdm2_gpu, rdm3_gpu = _make_dm123_o1(fname, cibra, ciket, norb, nelec)
+      rdm1_correct = np.allclose(rdm1_cpu, rdm1_gpu)
+      rdm2_correct = np.allclose(rdm2_cpu, rdm2_gpu)
+      rdm3_correct = np.allclose(rdm3_cpu, rdm3_gpu)
+      if rdm1_correct and rdm2_correct and rdm3_correct:
+        print("all_rdm_correct")
+      else:
+        print("Issue in 3pdm")
+        print("rdm1 correct?", rdm1_correct)
+        print("rdm2 correct?", rdm2_correct)
+        print("rdm3 correct?", rdm3_correct)
+        exit()
+      return rdm1_cpu.T, rdm2_cpu, rdm3_cpu
+
+def _make_dm123_o0(fname, cibra, ciket, norb, nelec):
+      rdm1 = numpy.empty((norb,)*2)
+      rdm2 = numpy.empty((norb,)*4)
+      rdm3 = numpy.empty((norb,)*6)
+      librdm.FCIrdm3_drv(getattr(librdm, fname),
+                   rdm1.ctypes.data_as(ctypes.c_void_p),
+                   rdm2.ctypes.data_as(ctypes.c_void_p),
+                   rdm3.ctypes.data_as(ctypes.c_void_p),
+                   cibra.ctypes.data_as(ctypes.c_void_p),
+                   ciket.ctypes.data_as(ctypes.c_void_p),
+                   ctypes.c_int(norb),
+                   ctypes.c_int(na), ctypes.c_int(nb),
+                   ctypes.c_int(nlinka), ctypes.c_int(nlinkb),
+                   link_indexa.ctypes.data_as(ctypes.c_void_p),
+                   link_indexb.ctypes.data_as(ctypes.c_void_p))
+      rdm3 = _complete_dm3_(rdm2, rdm3)
+      return rdm1.T, rdm2, rdm3
+
+def _make_dm123_o1(fname, cibra, ciket, norb, nelec): 
+    from mrh.my_pyscf.gpu import libgpu
+    rdm1 = numpy.empty((norb,)*2)
+    rdm2 = numpy.empty((norb,)*4)
+    rdm3 = numpy.empty((norb,)*6)
+    libgpu.init_tdm1(gpu, norb)
+    libgpu.init_tdm2(gpu, norb)
+    libgpu.init_tdm3(gpu, norb)
+    libgpu.push_cibra(gpu, cibra, na, nb, 0)
+    libgpu.push_ciket(gpu, ciket, na, nb, 0)
+    libgpu.push_link_index_ab(gpu, na, nb, nlinka, nlinkb, link_indexa, link_indexb)
+    libgpu.compute_3pdm_kern_sf(gpu, na, nb, nlinka, nlinkb, norb, 0)
+    libgpu.pull_tdm1(gpu, rdm1, norb, 0)
+    libgpu.pull_tdm2(gpu, rdm2, norb, 0)
+    libgpu.pull_tdm3(gpu, rdm3, norb, 0)
+    rdm3 = _complete_dm3_(rdm2, rdm3)
+    return rdm1.T, rdm2, rdm3
+
+def _complete_dm3_(dm2, dm3):
+    # fci_4pdm.c assumed symmetry p >= r >= t for 3-pdm <p^+ q r^+ s t^+ u>
+    # Using E^r_sE^p_q = E^p_qE^r_s - \delta_{qr}E^p_s + \delta_{ps}E^r_q to
+    # complete the full 3-pdm
+    def transpose01(ijk, i, j, k):
+        jik = ijk.transpose(1,0,2)
+        jik[:,j] -= dm2[i,:,k,:]
+        jik[i,:] += dm2[j,:,k,:]
+        dm3[j,:,i,:,k,:] = jik
+        return jik
+    def transpose12(ijk, i, j, k):
+        ikj = ijk.transpose(0,2,1)
+        ikj[:,:,k] -= dm2[i,:,j,:]
+        ikj[:,j,:] += dm2[i,:,k,:]
+        dm3[i,:,k,:,j,:] = ikj
+        return ikj
+
+    # ijk -> jik -> jki -> kji -> kij -> ikj
+    norb = dm2.shape[0]
+    for i in range(norb):
+        for j in range(i+1):
+            for k in range(j+1):
+                tmp = transpose01(dm3[i,:,j,:,k,:].copy(), i, j, k)
+                tmp = transpose12(tmp, j, i, k)
+                tmp = transpose01(tmp, j, k, i)
+                tmp = transpose12(tmp, k, j, i)
+                tmp = transpose01(tmp, k, i, j)
+    return dm3
