@@ -36,81 +36,56 @@ def _make_rdm1_spin1(fname, cibra, ciket, norb, nelec, link_index=None):
     assert (cibra.size == na*nb), '{} {} {}'.format (cibra.size, na, nb)
     assert (ciket.size == na*nb), '{} {} {}'.format (ciket.size, na, nb)
     if use_gpu and gpu_debug:
-      from mrh.my_pyscf.gpu import libgpu
-      rdm_cpu = numpy.empty((norb,norb))
-      fn = getattr(librdm, fname)
-      fn(rdm_cpu.ctypes.data_as(ctypes.c_void_p),
-       cibra.ctypes.data_as(ctypes.c_void_p),
-       ciket.ctypes.data_as(ctypes.c_void_p),
-       ctypes.c_int(norb),
-       ctypes.c_int(na), ctypes.c_int(nb),
-       ctypes.c_int(nlinka), ctypes.c_int(nlinkb),
-       link_indexa.ctypes.data_as(ctypes.c_void_p),
-       link_indexb.ctypes.data_as(ctypes.c_void_p))
-      rdm_gpu = numpy.empty((norb,norb))
-      libgpu.init_tdm1(gpu, norb)
-      libgpu.push_cibra(gpu, cibra, na, nb, 0)
-      libgpu.push_ciket(gpu, ciket, na, nb, 0)
-      if fname == 'FCItrans_rdm1a': 
-        libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
-        libgpu.compute_trans_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCItrans_rdm1b':
-        libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
-        libgpu.compute_trans_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCImake_rdm1a':
-        libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
-        libgpu.compute_make_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCImake_rdm1b':
-        libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
-        libgpu.compute_make_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      libgpu.pull_tdm1(gpu, rdm_gpu, norb, 0)
-      libgpu.barrier(gpu)
+      rdm_cpu = _make_rdm1_o0(fname, cibra, ciket, norb, nelec, link_index=link_index)
+      rdm_gpu = _make_rdm1_o1(fname, cibra, ciket, norb, nelec, link_index=link_index)
       if (numpy.allclose(rdm_cpu, rdm_gpu)):
         print("RDM1_spin1", fname, "TDM1s calculate correctly", flush=True)
       else: 
         print("Problem in TDM1")
-        print("rdm_cpu")
-        print(rdm_cpu)
-        print("rdm_gpu")
-        print(rdm_gpu)
-      return rdm_gpu.T
+      return rdm_cpu.T
     elif use_gpu:  
- 
-      from mrh.my_pyscf.gpu import libgpu
-      rdm_gpu = numpy.empty((norb,norb))
-      libgpu.init_tdm1(gpu, norb)
-      libgpu.push_cibra(gpu, cibra, na, nb, 0)
-      libgpu.push_ciket(gpu, ciket, na, nb, 0)
-
-      if fname == 'FCItrans_rdm1a': 
-        libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
-        libgpu.compute_trans_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCItrans_rdm1b':
-        libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
-        libgpu.compute_trans_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCImake_rdm1a':
-        libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
-        libgpu.compute_make_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      elif fname == 'FCImake_rdm1b':
-        libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
-        libgpu.compute_make_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
-      libgpu.pull_tdm1(gpu, rdm_gpu, norb, 0)
-      libgpu.barrier(gpu)
-
+      rdm_gpu = _make_rdm1_o1(fname, cibra, ciket, norb, nelec, link_index=link_index)
       return rdm_gpu.T
-
     else:
-      rdm1 = numpy.empty((norb,norb))
-      fn = getattr(librdm, fname)
-      fn(rdm1.ctypes.data_as(ctypes.c_void_p),
-       cibra.ctypes.data_as(ctypes.c_void_p),
-       ciket.ctypes.data_as(ctypes.c_void_p),
-       ctypes.c_int(norb),
-       ctypes.c_int(na), ctypes.c_int(nb),
-       ctypes.c_int(nlinka), ctypes.c_int(nlinkb),
-       link_indexa.ctypes.data_as(ctypes.c_void_p),
-       link_indexb.ctypes.data_as(ctypes.c_void_p))
-      return rdm1.T
+      rdm_cpu = _make_rdm1_o0(fname, cibra, ciket, norb, nelec, link_index=link_index)
+      return rdm_cpu.T
+
+def _make_rdm1_spin_o0(fname, cibra, ciket, norb, nelec, link_index):
+    rdm1 = numpy.empty((norb,norb))
+    fn = getattr(librdm, fname)
+    fn(rdm1.ctypes.data_as(ctypes.c_void_p),
+     cibra.ctypes.data_as(ctypes.c_void_p),
+     ciket.ctypes.data_as(ctypes.c_void_p),
+     ctypes.c_int(norb),
+     ctypes.c_int(na), ctypes.c_int(nb),
+     ctypes.c_int(nlinka), ctypes.c_int(nlinkb),
+     link_indexa.ctypes.data_as(ctypes.c_void_p),
+     link_indexb.ctypes.data_as(ctypes.c_void_p))
+    return rdm1
+
+def _make_rdm1_spin_o1(fname, cibra, ciket, norb, nelec, link_index):
+    from mrh.my_pyscf.gpu import libgpu
+    rdm1 = numpy.empty((norb,norb))
+    libgpu.init_tdm1(gpu, norb)
+    libgpu.push_cibra(gpu, cibra, na, nb, 0)
+    libgpu.push_ciket(gpu, ciket, na, nb, 0)
+    if fname == 'FCItrans_rdm1a': 
+      libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
+      libgpu.compute_trans_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
+    elif fname == 'FCItrans_rdm1b':
+      libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
+      libgpu.compute_trans_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
+    elif fname == 'FCImake_rdm1a':
+      libgpu.push_link_indexa(gpu, na, nlinka, link_indexa) #TODO: move up to direct spin1 or just generate on the fly
+      libgpu.compute_make_rdm1a(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
+    elif fname == 'FCImake_rdm1b':
+      libgpu.push_link_indexb(gpu, nb, nlinkb, link_indexb) #TODO: move up to direct_spin1 or just generate on the fly
+      libgpu.compute_make_rdm1b(gpu, na, nb, nlinka, nlinkb, norb, 0) #TODO: update name
+    libgpu.pull_tdm1(gpu, rdm1, norb, 0)
+    libgpu.barrier(gpu)
+    return rdm1
+
+
 
 def _reorder_rdm(rdm1, rdm2, inplace=False):
     nmo = rdm1.shape[0]
