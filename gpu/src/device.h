@@ -290,6 +290,11 @@ public :
                                 int, int, int, int, int*);
   void compute_FCIrdm3h_b_t1ci_v3 (double *, double *, int, int, int, int, int, int,
                                 int, int, int, int, int*);
+  void compute_FCI_t1ci_sf(double *, double *, int, int, int, int, int, int, int, int *, int *);
+  void compute_rdm4_0b_t2_part2(double *, double *, int, int, int, int, int, int, int, int *, int *);
+  void compute_rdm4_a_t2_part2(double *, double *, int, int, int, int, int);
+  void compute_FCI_t2ci_sf(double *, double *, int, int, int, int, int, int, int, int *, int *);
+  void compute_3pdm_part2(double *, double *, int, int, int);
   void reorder(double *, double *, double *, int);
   void reduce_buf3_to_rdm(const double *, double *, int, int);
   void filter_sfudm(const double *, double *, int);
